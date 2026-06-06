@@ -20,7 +20,7 @@ export class LLMProvider {
       });
     }
 
-    this.defaultModel = process.env.AI_MODEL || 'gemini-1.5-flash';
+    this.defaultModel = process.env.AI_MODEL || 'gemini-3.5-flash-lite';
     this.fallbackModel = process.env.AI_FALLBACK_MODEL || 'gemini-2.5-pro';
   }
 
