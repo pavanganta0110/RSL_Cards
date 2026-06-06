@@ -1,0 +1,38 @@
+{
+  "name": "rsl-cards",
+  "private": true,
+  "packageManager": "bun@1.3.14",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "bun --filter @rsl/backend run dev",
+    "build": "turbo build",
+    "test": "turbo test",
+    "test:coverage": "turbo test -- --coverage",
+    "lint": "turbo lint",
+    "type-check": "turbo type-check",
+    "db:generate:dev": "bun --filter @rsl/shared-db run generate:dev",
+    "db:generate:qa": "bun --filter @rsl/shared-db run generate:qa",
+    "db:generate:prod": "bun --filter @rsl/shared-db run generate:prod",
+    "db:generate:test": "bun --filter @rsl/shared-db run generate:test",
+    "db:generate": "bun --filter @rsl/shared-db run generate:dev",
+    "db:migrate:dev": "bun --filter @rsl/shared-db run migrate:dev",
+    "db:migrate:qa": "bun --filter @rsl/shared-db run migrate:qa",
+    "db:migrate:prod": "bun --filter @rsl/shared-db run migrate:prod",
+    "db:migrate:test": "bun --filter @rsl/shared-db run migrate:test",
+    "db:seed": "bun --filter @rsl/shared-db run seed:dev",
+    "db:seed:dev": "bun --filter @rsl/shared-db run seed:dev",
+    "db:studio": "bun --filter @rsl/shared-db run studio"
+  },
+  "devDependencies": {
+    "@sinclair/typebox": "^0.34.0",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2",
+    "ws": "8"
+  }
+}

@@ -1,0 +1,94 @@
+name: rsl-qa
+
+services:
+  postgres-qa:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: rsl_user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: rslcards_qa
+    volumes:
+      - postgres_qa_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rsl_user -d rslcards_qa"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rsl-qa
+
+  redis-qa:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_qa_data:/data
+    networks:
+      - rsl-qa
+
+  pgbouncer:
+    image: bitnami/pgbouncer:latest
+    environment:
+      POSTGRESQL_HOST: postgres-qa
+      POSTGRESQL_PORT_NUMBER: "5432"
+      POSTGRESQL_USERNAME: rsl_user
+      POSTGRESQL_PASSWORD: password
+      PGBOUNCER_DATABASE: rslcards_qa
+      PGBOUNCER_POOL_MODE: transaction
+      PGBOUNCER_MAX_CLIENT_CONN: "100"
+      PGBOUNCER_DEFAULT_POOL_SIZE: "20"
+    depends_on:
+      postgres-qa:
+        condition: service_healthy
+    networks:
+      - rsl-qa
+    restart: always
+
+  # Single QA backend monorepo service serving all modules
+  backend:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+    container_name: rsl-backend-qa
+    env_file:
+      - .env.qa
+    environment:
+      NODE_ENV: qa
+      LOG_LEVEL: info
+      AUTH_SERVICE_PORT: 3000
+      AUTH_GATEWAY_IN_DOCKER: "1"
+    ports:
+      - "3000:3000"
+    depends_on:
+      pgbouncer:
+        condition: service_started
+      redis-qa:
+        condition: service_started
+    networks:
+      - rsl-qa
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.0"
+    restart: always
+
+  nginx-qa:
+    image: nginx:alpine
+    container_name: rsl-nginx-qa
+    ports:
+      - "4080:80"
+    volumes:
+      - ../nginx/qa.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+    networks:
+      - rsl-qa
+    restart: always
+
+volumes:
+  postgres_qa_data:
+  redis_qa_data:
+
+networks:
+  rsl-qa:
+    driver: bridge

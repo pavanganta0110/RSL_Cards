@@ -1,0 +1,20 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.local
+docker-volumes
+coverage
+.turbo
+*.log
+.DS_Store
+.pnpm-store/
+.expo/
+
+# Web Next.js / Builds
+.next
+out
+build
+.eslintcache
+*.tsbuildinfo

@@ -1,0 +1,60 @@
+# fly.toml file for rsl-cards
+
+app = "rsl-cards"
+primary_region = "dfw"
+
+[build]
+  dockerfile = "backend/Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  LOG_LEVEL = "info"
+  
+  # Configuration and Credentials from .env.dev
+  EBAY_ENV = "production"
+  AWS_REGION = "eu-north-1"
+  S3_BUCKET_NAME = "goodseva-admin"
+  
+  JWT_PRIVATE_KEY = "dev_hs256_secret_key_rsl_cards_change_in_prod"
+  JWT_PUBLIC_KEY = "dev_hs256_secret_key_rsl_cards_change_in_prod"
+  INTERNAL_SERVICE_KEY = "dev-internal-service-key-change-me-64chars-minimum________"
+  
+  EBAY_SANDBOX_CLIENT_ID = "REPLACE_WITH_EBAY_SANDBOX_CLIENT_ID"
+  EBAY_SANDBOX_CLIENT_SECRET = "REPLACE_WITH_EBAY_SANDBOX_CLIENT_SECRET"
+  EBAY_SANDBOX_RU_NAME = "REPLACE_WITH_EBAY_SANDBOX_RU_NAME"
+  
+  EBAY_PROD_CLIENT_ID = "REPLACE_WITH_EBAY_PROD_CLIENT_ID"
+  EBAY_PROD_CLIENT_SECRET = "REPLACE_WITH_EBAY_PROD_CLIENT_SECRET"
+  EBAY_PROD_RU_NAME = "REPLACE_WITH_EBAY_PROD_RU_NAME"
+  
+  GOOGLE_GEN_AI_KEY = "REPLACE_WITH_GOOGLE_GEN_AI_KEY"
+  GOOGLE_CLIENT_ID = "REPLACE_WITH_GOOGLE_CLIENT_ID"
+  APPLE_AUDIENCE = "REPLACE_WITH_APPLE_AUDIENCE"
+  
+  AWS_ACCESS_KEY_ID = "REPLACE_WITH_AWS_ACCESS_KEY_ID"
+  AWS_SECRET_ACCESS_KEY = "REPLACE_WITH_AWS_SECRET_ACCESS_KEY"
+  
+  XIMILAR_API_KEY = "REPLACE_WITH_XIMILAR_API_KEY"
+  SOLD_COMPS_KEY = "REPLACE_WITH_SOLD_COMPS_KEY"
+
+[deploy]
+  release_command = "bun x drizzle-kit migrate --config drizzle.prod.config.ts"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "40s"
+    interval = "30s"
+    method = "GET"
+    path = "/health"
+    protocol = "http"
+    timeout = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

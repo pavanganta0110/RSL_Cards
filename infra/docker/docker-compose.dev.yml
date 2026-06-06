@@ -1,0 +1,170 @@
+name: rsl-dev
+
+# Linux containers must not use the host bind-mounted node_modules
+x-node-dev-volumes: &node-dev-volumes
+  - ../../:/workspace
+  - rsl_dev_node_modules:/workspace/node_modules
+
+services:
+  rsldb:
+    image: postgres:16-alpine
+    container_name: rsl-dev-rsldb-1
+    env_file:
+      - .env.dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - rsldb_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rsl_user -d rsldb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rsl-dev
+
+  rsldb-read:
+    image: postgres:16-alpine
+    container_name: rsl-dev-rsldb-read-1
+    env_file:
+      - .env.dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - rsldb_read_data:/var/lib/postgresql/data
+    networks:
+      - rsl-dev
+
+  rsldb-test:
+    image: postgres:16-alpine
+    container_name: rsl-dev-rsldb-test-1
+    env_file:
+      - .env.dev
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB_TEST:-rsldb_test}
+    ports:
+      - "5434:5432"
+    volumes:
+      - rsldb_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rsl_user -d rsldb_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rsl-dev
+
+  redis-dev:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - rsl-dev
+
+  # One install for Linux-native deps; avoids races from parallel installs.
+  dev-install:
+    image: oven/bun:latest
+    working_dir: /workspace
+    container_name: rsl-dev-install
+    volumes: *node-dev-volumes
+    environment:
+      CI: "true"
+    command:
+      - sh
+      - -lc
+      - bun install
+    restart: "no"
+    networks:
+      - rsl-dev
+
+  # Single backend monorepo service serving all modules
+  backend:
+    image: oven/bun:latest
+    working_dir: /workspace/backend
+    container_name: rsl-backend-dev
+    env_file:
+      - .env.dev
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /root/.config/gcloud/application_default_credentials.json
+    volumes:
+      - ../../:/workspace
+      - rsl_dev_node_modules:/workspace/node_modules
+      - ~/.config/gcloud/application_default_credentials.json:/root/.config/gcloud/application_default_credentials.json:ro
+    depends_on:
+      dev-install:
+        condition: service_completed_successfully
+      rsldb:
+        condition: service_healthy
+      redis-dev:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command:
+      - bun
+      - run
+      - dev
+    networks:
+      - rsl-dev
+    restart: unless-stopped
+
+  backend-test:
+    image: oven/bun:latest
+    working_dir: /workspace/backend
+    container_name: rsl-backend-test
+    env_file:
+      - .env.dev
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /root/.config/gcloud/application_default_credentials.json
+      NODE_ENV: test
+    volumes:
+      - ../../:/workspace
+      - rsl_dev_node_modules:/workspace/node_modules
+      - ~/.config/gcloud/application_default_credentials.json:/root/.config/gcloud/application_default_credentials.json:ro
+    depends_on:
+      dev-install:
+        condition: service_completed_successfully
+      rsldb-test:
+        condition: service_healthy
+      redis-dev:
+        condition: service_started
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command:
+      - sh
+      - -c
+      - "DATABASE_URL=$$TEST_DATABASE_URL bun run db:migrate && bun test --sequence"
+    networks:
+      - rsl-dev
+
+  nginx-dev:
+    image: nginx:alpine
+    container_name: rsl-nginx-dev
+    ports:
+      - "80:80"
+    volumes:
+      - ../nginx/dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+    networks:
+      - rsl-dev
+    restart: unless-stopped
+
+volumes:
+  rsl_dev_node_modules:
+  rsldb_data:
+  rsldb_read_data:
+  rsldb_test_data:
+  redis_dev_data:
+  grafana_data:
+  loki_data:
+
+networks:
+  rsl-dev:
+    driver: bridge
