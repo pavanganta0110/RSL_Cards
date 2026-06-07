@@ -79,6 +79,7 @@ const app = new Elysia()
   .use(analyticsModule)
   .use(adminModule)
   .use(listingModule)
+  .use(aiPilotModule)
   // Highly comprehensive Health Check Endpoint mapping DB, Redis, BullMQ, and backend systems
   .get("/health", async (ctx: any) => {
     const dbStatus = await testDbConnection();
