@@ -3,7 +3,7 @@ import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
 import { env } from "./config/index.js";
 import { logger } from "./lib/logger.js";
-import { testDbConnection } from "./db/index.js";
+import { db, testDbConnection } from "./db/index.js";
 import { redisAdapter } from "./adapters/redis.adapter.js";
 import { bullMqAdapter } from "./adapters/bullmq.adapter.js";
 import { authModule } from "./modules/auth/index.js";
@@ -45,16 +45,42 @@ const app = new Elysia()
     // Log API transaction with high visibility
     logger.info(`[HTTP] ${ctx.request.method} ${urlPath} - ${status} (${duration}ms)`);
   })
-  .onBeforeHandle((ctx: any) => {
+  .onBeforeHandle(async (ctx: any) => {
     const request = ctx.request;
     const authHeader = request.headers.get("authorization");
     if (authHeader?.startsWith("Bearer ")) {
       try {
         const token = authHeader.slice(7);
-        const payload = verifyToken(token, env);
-        if (payload && payload.userId) {
-          const userId = payload.userId;
-          const userRole = payload.role || "guest";
+        let userId = "";
+        let userRole = "guest";
+
+        if (token === "dev-token") {
+          // Development bypass: get or create dummy developer user
+          const { users } = await import("./db/schema/auth.js");
+          const { eq } = await import("drizzle-orm");
+          const dbUsers = await db.select().from(users).where(eq(users.role, "dealer")).limit(1);
+          if (dbUsers.length > 0) {
+            userId = dbUsers[0].id;
+            userRole = "dealer";
+          } else {
+            // Seed a developer user automatically
+            const [newDev] = await db.insert(users).values({
+              email: "dev-dealer@rslcards.com",
+              role: "dealer",
+              passwordHash: "not-needed-for-dev-token"
+            }).returning();
+            userId = newDev.id;
+            userRole = "dealer";
+          }
+        } else {
+          const payload = verifyToken(token, env);
+          if (payload && payload.userId) {
+            userId = payload.userId;
+            userRole = payload.role || "guest";
+          }
+        }
+
+        if (userId) {
           const originalGet = request.headers.get.bind(request.headers);
           (request.headers as any).get = (name: string) => {
             const lower = name.toLowerCase();
